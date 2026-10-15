@@ -1,62 +1,137 @@
-// Define the ESP32 ADC pins connected to your battery slots
-const int batteryPins[] = {32, 33, 34, 35};
-const int numBatteries = sizeof(batteryPins) / sizeof(batteryPins[0]);
+#include <Wire.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_SSD1306.h>
+#include <BLEDevice.h>
+#include <BLEServer.h>
+#include <BLEUtils.h>
+#include <BLE2902.h>
 
-// Voltage divider ratio calculation: 
-// Top Resistor (R1) = 20k, Bottom Resistor (R2) = 10k
-// Ratio = (R1 + R2) / R2 = (20 + 10) / 10 = 3.0
-const float voltageDividerRatio = 3.0;
+// --- OLED Setup ---
+#define SCREEN_WIDTH 128
+#define SCREEN_HEIGHT 64
+#define OLED_RESET    -1
+Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 
-// ESP32 ADC reference voltage is typically 3.3V, but analogReadMilliVolts handles internal calibration well.
-// If using standard analogRead(), we map 0-4095 to 0-3300mV.
+// --- BLE UUIDs ---
+#define SERVICE_UUID        "4fafc201-1fb5-459e-8fcc-c5c9c331914b"
+#define CHARACTERISTIC_UUID "beb5483e-36e1-4688-b7f5-ea07361b26a8"
+
+BLECharacteristic *pCharacteristic;
+bool deviceConnected = false;
+
+// --- ADC Pin Mapping (ESP32 DevKit) ---
+const int numSlots = 4;
+const int adcPins[numSlots] = {32, 33, 34, 35}; // ADC1 pins recommended with Wi-Fi/BLE
+
+// Calibration constants for 20k/10k voltage divider
+const float R_TOP = 20000.0; // 20k ohm
+const float R_BOTTOM = 10000.0; // 10k ohm
+const float ADC_VREF = 3.3;  // ESP32 ADC reference voltage
+const int ADC_MAX = 4095;    // 12-bit ADC
+
+class MyServerCallbacks: public BLEServerCallbacks {
+    void onConnect(BLEServer* pServer) {
+        deviceConnected = true;
+    }
+    void onDisconnect(BLEServer* pServer) {
+        deviceConnected = false;
+        pServer->startAdvertising(); // Restart advertising when disconnected
+    }
+};
 
 void setup() {
-  Serial.begin(115200);
-  delay(1000);
-  Serial.println("Smart 9V Battery Hub - ADC Telemetry Initialized");
+    Serial.begin(115200);
 
-  // Configure ADC pins as inputs
-  for (int i = 0; i < numBatteries; i++) {
-    pinMode(batteryPins[i], INPUT);
-  }
+    // Initialize I2C and SSD1306 OLED
+    Wire.begin(21, 22); // SDA = GPIO 21, SCL = GPIO 22
+    if(!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
+        Serial.println(F("SSD1306 allocation failed"));
+        while(true);
+    }
+    display.clearDisplay();
+    display.setTextSize(1);
+    display.setTextColor(SSD1306_WHITE);
+    display.setCursor(0, 0);
+    display.println("Smart 9V Harvester");
+    display.display();
+    delay(1000);
+
+    // Initialize BLE
+    BLEDevice::init("Smart-9V-Hub");
+    BLEServer *pServer = BLEDevice::createServer();
+    pServer->setCallbacks(new MyServerCallbacks());
+
+    BLEService *pService = pServer->createService(SERVICE_UUID);
+    pCharacteristic = pService->createCharacteristic(
+                        CHARACTERISTIC_UUID,
+                        BLECharacteristic::PROPERTY_READ   |
+                        BLECharacteristic::PROPERTY_NOTIFY
+                      );
+    pCharacteristic->addDescriptor(new BLE2902());
+
+    pService->start();
+    BLEAdvertising *pAdvertising = BLEDevice::getAdvertising();
+    pAdvertising->addServiceUUID(SERVICE_UUID);
+    pAdvertising->setScanResponse(true);
+    BLEDevice::startAdvertising();
+    Serial.println("BLE Device active, waiting for connections...");
 }
 
 void loop() {
-  Serial.println("----------------------------------------");
-  float totalBankVoltage = 0;
-  int activeBatteries = 0;
+    float voltages[numSlots];
+    float maxVoltage = 0.0;
+    float activeSum = 0.0;
+    int activeCount = 0;
 
-  for (int i = 0; i < numBatteries; i++) {
-    // Read raw ADC value (0 - 4095 on ESP32)
-    int rawValue = analogRead(batteryPins[i]);
-    
-    // Convert raw reading to millivolts at the ESP32 pin (approx. 0 to 3300mV)
-    // ESP32 ADC has non-linearity at extremes, but this is great for a baseline.
-    float pinVoltageMv = (rawValue / 4095.0) * 3300.0;
-    
-    // Scale back up using the voltage divider ratio to get the actual battery voltage
-    float batteryVoltage = (pinVoltageMv * voltageDividerRatio) / 1000.0; // convert to Volts
-
-    Serial.print("Battery Slot ");
-    Serial.print(i + 1);
-    Serial.print(": ");
-    
-    // Basic threshold to check if a battery is actually inserted (> 4.0V)
-    if (batteryVoltage > 4.0) {
-      Serial.print(batteryVoltage, 2);
-      Serial.println(" V");
-      totalBankVoltage += batteryVoltage;
-      activeBatteries++;
-    } else {
-      Serial.println("Empty / Dead (< 4V)");
+    // Read and calculate voltages for all battery slots
+    for (int i = 0; i < numSlots; i++) {
+        int rawValue = analogRead(adcPins[i]);
+        // Convert ADC reading to pin voltage
+        float pinVoltage = (rawValue / (float)ADC_MAX) * ADC_VREF;
+        // Reverse voltage divider formula to find actual battery voltage
+        float batteryVoltage = pinVoltage * ((R_TOP + R_BOTTOM) / R_BOTTOM);
+        
+        // Filter out noise or empty slots (under ~4V means no battery or dead cell)
+        if (batteryVoltage < 4.0) {
+            voltages[i] = 0.0;
+        } else {
+            voltages[i] = batteryVoltage;
+            activeSum += batteryVoltage;
+            activeCount++;
+        }
     }
-  }
 
-  Serial.print("Active Cells: ");
-  Serial.println(activeBatteries);
-  Serial.print("Combined Bank Parallel Voltage Pool: ");
-  Serial.print(totalBankVoltage / max(1, activeBatteries), 2); // Approximate parallel bus voltage
-  Serial.println(" V (avg)");
+    // Common bus average (or highest diode drop approximation)
+    float busAvg = (activeCount > 0) ? (activeSum / activeCount) : 0.0;
 
-  delay(2000); // Read every 2 seconds
+    // Update Local OLED Display
+    display.clearDisplay();
+    display.setCursor(0, 0);
+    display.println("--- 9V Smart Hub ---");
+    for (int i = 0; i < numSlots; i++) {
+        display.setCursor(0, 12 + (i * 10));
+        display.print("Slot "); display.print(i + 1); display.print(": ");
+        if (voltages[i] > 4.0) {
+            display.print(voltages[i], 2); display.println(" V");
+        } else {
+            display.println("Empty");
+        }
+    }
+    display.setCursor(0, 52);
+    display.print("Bus Avg: "); display.print(busAvg, 2); display.println(" V");
+    display.display();
+
+    // Broadcast over BLE if connected
+    if (deviceConnected) {
+        String payload = String(voltages[0], 2) + "," + 
+                         String(voltages[1], 2) + "," + 
+                         String(voltages[2], 2) + "," + 
+                         String(voltages[3], 2) + "|" + 
+                         String(busAvg, 2);
+        
+        pCharacteristic->setValue(payload.c_str());
+        pCharacteristic->notify();
+    }
+
+    delay(2000); // Send update every 2 seconds
 }
