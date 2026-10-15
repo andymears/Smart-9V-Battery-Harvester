@@ -18,3 +18,7 @@ An open-source hardware project that harvests remaining energy from used alkalin
 | 1N5819 Schottky Diodes | Individual battery back-feed protection | 5-6 |
 | 10kΩ & 20kΩ Resistors | Voltage dividers for ESP32 ADC pins | 10-12 |
 | 9V Battery Snaps / Holders | Physical battery bays | 5-6 |
+
+## 📄 Licensing
+- **Software & Firmware (`/firmware`, `/web-app`):** Licensed under the [MIT License](LICENSE).
+- **Hardware & CAD (`/hardware`):** Licensed under the [CERN Open Hardware Licence v2 - Permissive](https://ohwr.org/cernohl).
