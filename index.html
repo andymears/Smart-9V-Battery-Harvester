@@ -4,6 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <title>Smart 9V Battery Hub Telemetry</title>
     <style>
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #0f172a; color: #f8fafc; padding: 20px; text-align: center; }
@@ -20,6 +21,10 @@
 <body>
 
     <h1>🔋 Smart 9V Battery Hub</h1>
+    <div class="card">
+    <h3>Voltage History</h3>
+    <canvas id="voltageChart" width="350" height="200"></canvas>
+    </div>
     <div class="card">
         <button id="connectBtn" onclick="connectBLE()">Connect to Hub</button>
         <div id="status">Status: Disconnected</div>
