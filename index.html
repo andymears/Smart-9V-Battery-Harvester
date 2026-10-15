@@ -1,49 +1,93 @@
-<!-- Initial version created by Google Gemini-->
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <title>Smart 9V Battery Hub Telemetry</title>
+    <!-- Include Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #0f172a; color: #f8fafc; padding: 20px; text-align: center; }
-        .card { background: #1e293b; border-radius: 12px; padding: 20px; max-width: 400px; margin: 20px auto; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
-        button { background: #3b82f6; color: white; border: none; padding: 12px 24px; font-size: 16px; border-radius: 8px; cursor: pointer; font-weight: bold; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #0f172a; color: #f8fafc; padding: 20px; text-align: center; margin: 0; }
+        .container { max-width: 500px; margin: 0 auto; }
+        .card { background: #1e293b; border-radius: 12px; padding: 20px; margin: 15px auto; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
+        button { background: #3b82f6; color: white; border: none; padding: 12px 24px; font-size: 16px; border-radius: 8px; cursor: pointer; font-weight: bold; width: 100%; transition: background 0.2s; }
         button:hover { background: #2563eb; }
         .slot-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 15px; }
-        .slot { background: #334155; padding: 12px; border-radius: 8px; font-size: 14px; }
+        .slot { background: #334155; padding: 12px; border-radius: 8px; font-size: 14px; text-align: left; }
         .slot span { display: block; font-size: 20px; font-weight: bold; color: #38bdf8; margin-top: 5px; }
-        .summary { margin-top: 20px; font-size: 18px; background: #0284c7; padding: 10px; border-radius: 8px; }
-        #status { margin-top: 10px; font-size: 14px; color: #94a3b8; }
+        .summary { margin-top: 15px; font-size: 16px; background: #0284c7; padding: 10px; border-radius: 8px; font-weight: bold; }
+        #status { margin-top: 12px; font-size: 14px; color: #94a3b8; }
+        canvas { background: #0f172a; border-radius: 8px; margin-top: 10px; }
     </style>
 </head>
 <body>
 
-    <h1>🔋 Smart 9V Battery Hub</h1>
-    <div class="card">
-    <h3>Voltage History</h3>
-    <canvas id="voltageChart" width="350" height="200"></canvas>
-    </div>
-    <div class="card">
-        <button id="connectBtn" onclick="connectBLE()">Connect to Hub</button>
-        <div id="status">Status: Disconnected</div>
+    <div class="container">
+        <h1>🔋 Smart 9V Battery Hub</h1>
+        
+        <!-- Connection Card -->
+        <div class="card">
+            <button id="connectBtn" onclick="connectBLE()">Connect to Hub</button>
+            <div id="status">Status: Disconnected</div>
 
-        <div class="slot-grid">
-            <div class="slot">Slot 1<span id="slot1">-- V</span></div>
-            <div class="slot">Slot 2<span id="slot2">-- V</span></div>
-            <div class="slot">Slot 3<span id="slot3">-- V</span></div>
-            <div class="slot">Slot 4<span id="slot4">-- V</span></div>
+            <div class="slot-grid">
+                <div class="slot">Slot 1<span id="slot1">-- V</span></div>
+                <div class="slot">Slot 2<span id="slot2">-- V</span></div>
+                <div class="slot">Slot 3<span id="slot3">-- V</span></div>
+                <div class="slot">Slot 4<span id="slot4">-- V</span></div>
+            </div>
+
+            <div class="summary">
+                Common Bus Avg: <span id="busAvg">-- V</span>
+            </div>
         </div>
 
-        <div class="summary">
-            Common Bus Avg: <span id="busAvg" style="font-weight:bold;">-- V</span>
+        <!-- Live Chart Card -->
+        <div class="card">
+            <h3>Voltage History</h3>
+            <canvas id="voltageChart" width="400" height="220"></canvas>
         </div>
     </div>
 
     <script>
         const SERVICE_UUID = "4fafc201-1fb5-459e-8fcc-c5c9c331914b";
         const CHARACTERISTIC_UUID = "beb5483e-36e1-4688-b7f5-ea07361b26a8";
+
+        // Initialize Chart.js Line Graph
+        const ctx = document.getElementById('voltageChart').getContext('2d');
+        const voltageChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [
+                    { label: 'Slot 1', data: [], borderColor: '#38bdf8', tension: 0.2, fill: false },
+                    { label: 'Slot 2', data: [], borderColor: '#4ade80', tension: 0.2, fill: false },
+                    { label: 'Slot 3', data: [], borderColor: '#f43f5e', tension: 0.2, fill: false },
+                    { label: 'Slot 4', data: [], borderColor: '#fbbf24', tension: 0.2, fill: false },
+                    { label: 'Bus Avg', data: [], borderColor: '#c084fc', borderDash: [4,4], borderWidth: 2, tension: 0.2, fill: false }
+                ]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: { labels: { color: '#f8fafc', boxWidth: 12 } }
+                },
+                scales: {
+                    y: { 
+                        min: 0, 
+                        max: 9.5, 
+                        grid: { color: '#334155' },
+                        ticks: { color: '#94a3b8' },
+                        title: { display: true, text: 'Voltage (V)', color: '#94a3b8' } 
+                    },
+                    x: { 
+                        grid: { color: '#334155' },
+                        ticks: { color: '#94a3b8', maxTicksLimit: 6 },
+                        title: { display: true, text: 'Time', color: '#94a3b8' } 
+                    }
+                }
+            }
+        });
 
         async function connectBLE() {
             try {
@@ -62,7 +106,6 @@
                 document.getElementById('status').innerText = "Status: Connected & Streaming";
                 document.getElementById('connectBtn').style.display = "none";
 
-                // Read initial value & listen for notifications
                 await characteristic.startNotifications();
                 characteristic.addEventListener('characteristicvaluechanged', handleData);
 
@@ -74,12 +117,13 @@
 
         function handleData(event) {
             const value = new TextDecoder().decode(event.target.value);
-            // Payload format: "8.12,7.95,6.80,0.00|7.62"
             const parts = value.split('|');
             if (parts.length === 2) {
                 const voltages = parts[0].split(',');
-                const avg = parts[1];
+                const avg = parseFloat(parts[1]);
+                const timeNow = new Date().toLocaleTimeString();
 
+                // Update text metrics
                 for (let i = 0; i < voltages.length; i++) {
                     const slotElem = document.getElementById(`slot${i+1}`);
                     if (slotElem) {
@@ -87,6 +131,20 @@
                     }
                 }
                 document.getElementById('busAvg').innerText = `${avg} V`;
+
+                // Keep rolling window of last 20 data points on chart
+                if (voltageChart.data.labels.length > 20) {
+                    voltageChart.data.labels.shift();
+                    voltageChart.data.datasets.forEach(dataset => dataset.data.shift());
+                }
+
+                voltageChart.data.labels.push(timeNow);
+                for (let i = 0; i < voltages.length; i++) {
+                    voltageChart.data.datasets[i].data.push(parseFloat(voltages[i]));
+                }
+                voltageChart.data.datasets[4].data.push(avg);
+                
+                voltageChart.update();
             }
         }
     </script>
