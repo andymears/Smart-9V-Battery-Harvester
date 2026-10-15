@@ -1,24 +1,28 @@
-# Smart 9V Battery Management Hub (V1)
-An open-source hardware project that harvests remaining energy from used alkaline 9V smoke detector batteries, combining them intelligently into a stabilized 12V automotive socket for universal USB charging and device power.
+# 🔋 Smart 9V Battery Harvester
 
-## 🛠 Project Architecture
-- **Input:** 5-6 used alkaline 9V batteries in parallel, isolated via Schottky diodes.
-- **Sensing:** ESP32 microcontroller with individual ADC voltage dividers.
-- **Regulation:** XL6009 DC-DC Boost Converter stepping the dropping cell voltage up to 12.0V.
-- **Output:** Standard 12V automotive cigarette lighter socket (compatible with standard car USB adapters).
-- **Telemetry:** I2C OLED local display + Bluetooth Low Energy (BLE) Web Dashboard.
+An open-source, 6-slot hardware and software system designed to aggregate voltage from multiple 9V batteries into a single regulated 12V output. Featuring real-time ESP32 telemetry, local OLED status monitoring, and a responsive web-based Bluetooth dashboard complete with a built-in interactive simulation mode.
 
-## 📋 Bill of Materials (BOM)
-| Component | Purpose | Qty |
-| :--- | :--- | :--- |
-| ESP32 DevKit V1 | Microcontroller, ADC sensing, and BLE telemetry | 1 |
-| 0.96" I2C OLED (SSD1306) | Local status display | 1 |
-| XL6009 Boost Converter Module | Boosts input rail to steady 12V | 1 |
-| 12V Panel Mount Auto Socket | Universal output receptacle | 1 |
-| 1N5819 Schottky Diodes | Individual battery back-feed protection | 5-6 |
-| 10kΩ & 20kΩ Resistors | Voltage dividers for ESP32 ADC pins | 10-12 |
-| 9V Battery Snaps / Holders | Physical battery bays | 5-6 |
+---
 
-## 📄 Licensing
-- **Software & Firmware (`/firmware`, `/web-app`):** Licensed under the [MIT License](LICENSE).
-- **Hardware & CAD (`/hardware`):** Licensed under the [CERN Open Hardware Licence v2 - Permissive](https://ohwr.org/cernohl).
+## 🚀 Features
+* **6-Slot Parallel Architecture:** Isolated inputs using 1N5819 Schottky diodes to prevent cross-charging and back-feeding.
+* **ESP32 Telemetry:** Real-time multi-channel ADC voltage sampling using $20\text{ k}\Omega / 10\text{ k}\Omega$ resistor dividers.
+* **Web Bluetooth Dashboard (`index.html`):** Live Chart.js visualization tracking individual slot voltages and bus average.
+* **Interactive Simulation Mode:** Test the dashboard locally in your browser without physical hardware by toggling fresh, depleted, or empty battery states.
+* **Local OLED Display:** SSD1306 display providing instant on-device status metrics.
+
+---
+
+## 📋 Bill of Materials
+See the full [Bill of Materials (BOM)](./bom.md) for a detailed component breakdown.
+
+---
+
+## 🌐 Web Dashboard & Simulation
+You can access the live web dashboard hosted via GitHub Pages or run `index.html` locally in any Web Bluetooth-compatible browser (such as Google Chrome or Microsoft Edge). Click **Start Simulation Mode** to test telemetry and visual charts instantly.
+
+---
+
+## 📜 Licensing
+* **Software:** Licensed under the [MIT License](LICENSE-SOFTWARE).
+* **Hardware:** Licensed under the [CERN Open Hardware Licence (CERN-OHL-P)](LICENSE-HARDWARE).
