@@ -10,11 +10,18 @@
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #0f172a; color: #f8fafc; padding: 20px; text-align: center; margin: 0; }
         .container { max-width: 500px; margin: 0 auto; }
         .card { background: #1e293b; border-radius: 12px; padding: 20px; margin: 15px auto; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
-        button { background: #3b82f6; color: white; border: none; padding: 12px 24px; font-size: 16px; border-radius: 8px; cursor: pointer; font-weight: bold; width: 100%; transition: background 0.2s; }
+        button { background: #3b82f6; color: white; border: none; padding: 12px 24px; font-size: 16px; border-radius: 8px; cursor: pointer; font-weight: bold; width: 100%; transition: background 0.2s; margin-top: 8px; }
         button:hover { background: #2563eb; }
+        button.sim { background: #10b981; }
+        button.sim:hover { background: #059669; }
         .slot-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 15px; }
         .slot { background: #334155; padding: 12px; border-radius: 8px; font-size: 14px; text-align: left; }
         .slot span { display: block; font-size: 20px; font-weight: bold; color: #38bdf8; margin-top: 5px; }
+        .sim-controls { display: none; margin-top: 8px; gap: 4px; }
+        .sim-controls button { padding: 6px; font-size: 11px; margin-top: 0; background: #475569; }
+        .sim-controls button:hover { background: #64748b; }
+        .sim-controls button.remove { background: #7f1d1d; }
+        .sim-controls button.remove:hover { background: #991b1b; }
         .summary { margin-top: 15px; font-size: 16px; background: #0284c7; padding: 10px; border-radius: 8px; font-weight: bold; }
         #status { margin-top: 12px; font-size: 14px; color: #94a3b8; }
         canvas { background: #0f172a; border-radius: 8px; margin-top: 10px; }
@@ -28,13 +35,42 @@
         <!-- Connection Card -->
         <div class="card">
             <button id="connectBtn" onclick="connectBLE()">Connect to Hub</button>
+            <button id="simBtn" class="sim" onclick="toggleSimulation()">Start Simulation Mode</button>
             <div id="status">Status: Disconnected</div>
 
             <div class="slot-grid">
-                <div class="slot">Slot 1<span id="slot1">-- V</span></div>
-                <div class="slot">Slot 2<span id="slot2">-- V</span></div>
-                <div class="slot">Slot 3<span id="slot3">-- V</span></div>
-                <div class="slot">Slot 4<span id="slot4">-- V</span></div>
+                <div class="slot">
+                    Slot 1<span id="slot1">-- V</span>
+                    <div id="controls1" class="sim-controls">
+                        <button onclick="setSlotState(0, 8.4)">Fresh</button>
+                        <button onclick="setSlotState(0, 5.2)">Depleted</button>
+                        <button class="remove" onclick="setSlotState(0, 2.0)">Empty</button>
+                    </div>
+                </div>
+                <div class="slot">
+                    Slot 2<span id="slot2">-- V</span>
+                    <div id="controls2" class="sim-controls">
+                        <button onclick="setSlotState(1, 8.4)">Fresh</button>
+                        <button onclick="setSlotState(1, 5.2)">Depleted</button>
+                        <button class="remove" onclick="setSlotState(1, 2.0)">Empty</button>
+                    </div>
+                </div>
+                <div class="slot">
+                    Slot 3<span id="slot3">-- V</span>
+                    <div id="controls3" class="sim-controls">
+                        <button onclick="setSlotState(2, 8.4)">Fresh</button>
+                        <button onclick="setSlotState(2, 5.2)">Depleted</button>
+                        <button class="remove" onclick="setSlotState(2, 2.0)">Empty</button>
+                    </div>
+                </div>
+                <div class="slot">
+                    Slot 4<span id="slot4">-- V</span>
+                    <div id="controls4" class="sim-controls">
+                        <button onclick="setSlotState(3, 8.4)">Fresh</button>
+                        <button onclick="setSlotState(3, 5.2)">Depleted</button>
+                        <button class="remove" onclick="setSlotState(3, 2.0)">Empty</button>
+                    </div>
+                </div>
             </div>
 
             <div class="summary">
@@ -52,6 +88,10 @@
     <script>
         const SERVICE_UUID = "4fafc201-1fb5-459e-8fcc-c5c9c331914b";
         const CHARACTERISTIC_UUID = "beb5483e-36e1-4688-b7f5-ea07361b26a8";
+        
+        let isSimulating = false;
+        let simInterval = null;
+        let simulatedVoltages = [8.4, 7.2, 6.5, 4.2];
 
         // Initialize Chart.js Line Graph
         const ctx = document.getElementById('voltageChart').getContext('2d');
@@ -89,6 +129,51 @@
             }
         });
 
+        function toggleSimulation() {
+            isSimulating = !isSimulating;
+            const simBtn = document.getElementById('simBtn');
+            const connectBtn = document.getElementById('connectBtn');
+            const controlDivs = document.querySelectorAll('.sim-controls');
+
+            if (isSimulating) {
+                simBtn.innerText = "Stop Simulation Mode";
+                connectBtn.style.display = "none";
+                document.getElementById('status').innerText = "Status: Interactive Simulation Active";
+                controlDivs.forEach(div => div.style.display = "grid");
+                
+                simInterval = setInterval(() => {
+                    // Gradual background drain for active batteries
+                    simulatedVoltages = simulatedVoltages.map(v => {
+                        if (v <= 4.0) return v; // Keep empty slots empty unless manually changed
+                        let nextV = v - 0.02;
+                        return nextV < 4.0 ? 2.0 : +nextV.toFixed(2);
+                    });
+
+                    pushSimulationTick();
+                }, 2000);
+
+            } else {
+                simBtn.innerText = "Start Simulation Mode";
+                connectBtn.style.display = "block";
+                document.getElementById('status').innerText = "Status: Disconnected";
+                controlDivs.forEach(div => div.style.display = "none");
+                clearInterval(simInterval);
+            }
+        }
+
+        function setSlotState(index, voltage) {
+            if (!isSimulating) return;
+            simulatedVoltages[index] = voltage;
+            pushSimulationTick();
+        }
+
+        function pushSimulationTick() {
+            const active = simulatedVoltages.filter(v => v > 4.0);
+            const avg = active.length > 0 ? (active.reduce((a,b)=>a+b, 0) / active.length).toFixed(2) : "0.00";
+            const mockString = `${simulatedVoltages.join(',')}|${avg}`;
+            processTelemetry(mockString);
+        }
+
         async function connectBLE() {
             try {
                 document.getElementById('status').innerText = "Status: Scanning...";
@@ -105,9 +190,13 @@
 
                 document.getElementById('status').innerText = "Status: Connected & Streaming";
                 document.getElementById('connectBtn').style.display = "none";
+                document.getElementById('simBtn').style.display = "none";
 
                 await characteristic.startNotifications();
-                characteristic.addEventListener('characteristicvaluechanged', handleData);
+                characteristic.addEventListener('characteristicvaluechanged', (event) => {
+                    const value = new TextDecoder().decode(event.target.value);
+                    processTelemetry(value);
+                });
 
             } catch (error) {
                 console.error(error);
@@ -115,9 +204,8 @@
             }
         }
 
-        function handleData(event) {
-            const value = new TextDecoder().decode(event.target.value);
-            const parts = value.split('|');
+        function processTelemetry(dataString) {
+            const parts = dataString.split('|');
             if (parts.length === 2) {
                 const voltages = parts[0].split(',');
                 const avg = parseFloat(parts[1]);
@@ -132,7 +220,7 @@
                 }
                 document.getElementById('busAvg').innerText = `${avg} V`;
 
-                // Keep rolling window of last 20 data points on chart
+                // Update chart rolling window
                 if (voltageChart.data.labels.length > 20) {
                     voltageChart.data.labels.shift();
                     voltageChart.data.datasets.forEach(dataset => dataset.data.shift());
