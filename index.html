@@ -3,22 +3,22 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Smart 9V Battery Hub Telemetry</title>
+    <title>Smart 9V Battery Hub Telemetry (6-Slot)</title>
     <!-- Include Chart.js CDN -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #0f172a; color: #f8fafc; padding: 20px; text-align: center; margin: 0; }
-        .container { max-width: 500px; margin: 0 auto; }
+        .container { max-width: 600px; margin: 0 auto; }
         .card { background: #1e293b; border-radius: 12px; padding: 20px; margin: 15px auto; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
         button { background: #3b82f6; color: white; border: none; padding: 12px 24px; font-size: 16px; border-radius: 8px; cursor: pointer; font-weight: bold; width: 100%; transition: background 0.2s; margin-top: 8px; }
         button:hover { background: #2563eb; }
         button.sim { background: #10b981; }
         button.sim:hover { background: #059669; }
-        .slot-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 15px; }
+        .slot-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-top: 15px; }
         .slot { background: #334155; padding: 12px; border-radius: 8px; font-size: 14px; text-align: left; }
-        .slot span { display: block; font-size: 20px; font-weight: bold; color: #38bdf8; margin-top: 5px; }
-        .sim-controls { display: none; margin-top: 8px; gap: 4px; }
-        .sim-controls button { padding: 6px; font-size: 11px; margin-top: 0; background: #475569; }
+        .slot span { display: block; font-size: 18px; font-weight: bold; color: #38bdf8; margin-top: 4px; }
+        .sim-controls { display: none; margin-top: 8px; display: flex; flex-direction: column; gap: 3px; }
+        .sim-controls button { padding: 4px; font-size: 10px; margin-top: 0; background: #475569; }
         .sim-controls button:hover { background: #64748b; }
         .sim-controls button.remove { background: #7f1d1d; }
         .sim-controls button.remove:hover { background: #991b1b; }
@@ -30,7 +30,7 @@
 <body>
 
     <div class="container">
-        <h1>🔋 Smart 9V Battery Hub</h1>
+        <h1>🔋 Smart 9V Battery Hub (6-Slot)</h1>
         
         <!-- Connection Card -->
         <div class="card">
@@ -39,36 +39,58 @@
             <div id="status">Status: Disconnected</div>
 
             <div class="slot-grid">
+                <!-- Slot 1 -->
                 <div class="slot">
                     Slot 1<span id="slot1">-- V</span>
-                    <div id="controls1" class="sim-controls">
+                    <div id="controls1" class="sim-controls" style="display:none;">
                         <button onclick="setSlotState(0, 8.4)">Fresh</button>
                         <button onclick="setSlotState(0, 5.2)">Depleted</button>
                         <button class="remove" onclick="setSlotState(0, 2.0)">Empty</button>
                     </div>
                 </div>
+                <!-- Slot 2 -->
                 <div class="slot">
                     Slot 2<span id="slot2">-- V</span>
-                    <div id="controls2" class="sim-controls">
+                    <div id="controls2" class="sim-controls" style="display:none;">
                         <button onclick="setSlotState(1, 8.4)">Fresh</button>
                         <button onclick="setSlotState(1, 5.2)">Depleted</button>
                         <button class="remove" onclick="setSlotState(1, 2.0)">Empty</button>
                     </div>
                 </div>
+                <!-- Slot 3 -->
                 <div class="slot">
                     Slot 3<span id="slot3">-- V</span>
-                    <div id="controls3" class="sim-controls">
+                    <div id="controls3" class="sim-controls" style="display:none;">
                         <button onclick="setSlotState(2, 8.4)">Fresh</button>
                         <button onclick="setSlotState(2, 5.2)">Depleted</button>
                         <button class="remove" onclick="setSlotState(2, 2.0)">Empty</button>
                     </div>
                 </div>
+                <!-- Slot 4 -->
                 <div class="slot">
                     Slot 4<span id="slot4">-- V</span>
-                    <div id="controls4" class="sim-controls">
+                    <div id="controls4" class="sim-controls" style="display:none;">
                         <button onclick="setSlotState(3, 8.4)">Fresh</button>
                         <button onclick="setSlotState(3, 5.2)">Depleted</button>
                         <button class="remove" onclick="setSlotState(3, 2.0)">Empty</button>
+                    </div>
+                </div>
+                <!-- Slot 5 -->
+                <div class="slot">
+                    Slot 5<span id="slot5">-- V</span>
+                    <div id="controls5" class="sim-controls" style="display:none;">
+                        <button onclick="setSlotState(4, 8.4)">Fresh</button>
+                        <button onclick="setSlotState(4, 5.2)">Depleted</button>
+                        <button class="remove" onclick="setSlotState(4, 2.0)">Empty</button>
+                    </div>
+                </div>
+                <!-- Slot 6 -->
+                <div class="slot">
+                    Slot 6<span id="slot6">-- V</span>
+                    <div id="controls6" class="sim-controls" style="display:none;">
+                        <button onclick="setSlotState(5, 8.4)">Fresh</button>
+                        <button onclick="setSlotState(5, 5.2)">Depleted</button>
+                        <button class="remove" onclick="setSlotState(5, 2.0)">Empty</button>
                     </div>
                 </div>
             </div>
@@ -81,7 +103,7 @@
         <!-- Live Chart Card -->
         <div class="card">
             <h3>Voltage History</h3>
-            <canvas id="voltageChart" width="400" height="220"></canvas>
+            <canvas id="voltageChart" width="400" height="240"></canvas>
         </div>
     </div>
 
@@ -91,9 +113,9 @@
         
         let isSimulating = false;
         let simInterval = null;
-        let simulatedVoltages = [8.4, 7.2, 6.5, 4.2];
+        let simulatedVoltages = [8.4, 7.5, 6.8, 5.5, 4.2, 2.0]; // Initial 6-slot mock voltages
 
-        // Initialize Chart.js Line Graph
+        // Initialize Chart.js Line Graph for 6 slots + Bus Avg
         const ctx = document.getElementById('voltageChart').getContext('2d');
         const voltageChart = new Chart(ctx, {
             type: 'line',
@@ -104,13 +126,15 @@
                     { label: 'Slot 2', data: [], borderColor: '#4ade80', tension: 0.2, fill: false },
                     { label: 'Slot 3', data: [], borderColor: '#f43f5e', tension: 0.2, fill: false },
                     { label: 'Slot 4', data: [], borderColor: '#fbbf24', tension: 0.2, fill: false },
-                    { label: 'Bus Avg', data: [], borderColor: '#c084fc', borderDash: [4,4], borderWidth: 2, tension: 0.2, fill: false }
+                    { label: 'Slot 5', data: [], borderColor: '#a78bfa', tension: 0.2, fill: false },
+                    { label: 'Slot 6', data: [], borderColor: '#fb7185', tension: 0.2, fill: false },
+                    { label: 'Bus Avg', data: [], borderColor: '#38ef7d', borderDash: [4,4], borderWidth: 2, tension: 0.2, fill: false }
                 ]
             },
             options: {
                 responsive: true,
                 plugins: {
-                    legend: { labels: { color: '#f8fafc', boxWidth: 12 } }
+                    legend: { labels: { color: '#f8fafc', boxWidth: 12, font: { size: 11 } } }
                 },
                 scales: {
                     y: { 
@@ -138,13 +162,13 @@
             if (isSimulating) {
                 simBtn.innerText = "Stop Simulation Mode";
                 connectBtn.style.display = "none";
-                document.getElementById('status').innerText = "Status: Interactive Simulation Active";
-                controlDivs.forEach(div => div.style.display = "grid");
+                document.getElementById('status').innerText = "Status: 6-Slot Simulation Active";
+                controlDivs.forEach(div => div.style.display = "flex");
                 
                 simInterval = setInterval(() => {
                     // Gradual background drain for active batteries
                     simulatedVoltages = simulatedVoltages.map(v => {
-                        if (v <= 4.0) return v; // Keep empty slots empty unless manually changed
+                        if (v <= 4.0) return v;
                         let nextV = v - 0.02;
                         return nextV < 4.0 ? 2.0 : +nextV.toFixed(2);
                     });
@@ -211,7 +235,7 @@
                 const avg = parseFloat(parts[1]);
                 const timeNow = new Date().toLocaleTimeString();
 
-                // Update text metrics
+                // Update text metrics for 6 slots
                 for (let i = 0; i < voltages.length; i++) {
                     const slotElem = document.getElementById(`slot${i+1}`);
                     if (slotElem) {
@@ -228,9 +252,12 @@
 
                 voltageChart.data.labels.push(timeNow);
                 for (let i = 0; i < voltages.length; i++) {
-                    voltageChart.data.datasets[i].data.push(parseFloat(voltages[i]));
+                    if (voltageChart.data.datasets[i]) {
+                        voltageChart.data.datasets[i].data.push(parseFloat(voltages[i]));
+                    }
                 }
-                voltageChart.data.datasets[4].data.push(avg);
+                // Bus Avg is dataset index 6
+                voltageChart.data.datasets[6].data.push(avg);
                 
                 voltageChart.update();
             }
