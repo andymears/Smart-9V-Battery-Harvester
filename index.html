@@ -88,7 +88,13 @@
           <span id="statusText">Disconnected</span>
         </div>
 
-        <!-- Connect/Disconnect Button -->
+        <!-- Simulation Toggle Button -->
+        <button id="simBtn" onclick="toggleSimulationMode()" class="flex items-center gap-2 px-4 py-2 bg-purple-600/20 hover:bg-purple-600/30 text-purple-300 border border-purple-500/30 font-medium text-sm rounded-xl transition-all duration-200 active:scale-95">
+          <i data-lucide="play" class="w-4 h-4"></i>
+          <span id="simBtnText">Start Simulation Mode</span>
+        </button>
+
+        <!-- Connect/Disconnect BLE Button -->
         <button id="connectBtn" onclick="toggleBLEConnection()" class="flex items-center gap-2 px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white font-medium text-sm rounded-xl transition-all duration-200 shadow-lg shadow-brand-600/20 active:scale-95">
           <i data-lucide="bluetooth" class="w-4 h-4"></i>
           <span id="connectBtnText">Connect Harvester</span>
@@ -195,6 +201,8 @@
     let bleDevice = null;
     let bleCharacteristic = null;
     let isConnected = false;
+    let isSimulating = false;
+    let simTimer = null;
     let packetCounter = 0;
     let chartInstance = null;
     const maxDataPoints = 30; // Max points stored on line chart x-axis
@@ -382,8 +390,64 @@
       }
     }
 
+    // Toggle Simulation Mode
+    function toggleSimulationMode() {
+      if (isSimulating) {
+        stopSimulation();
+      } else {
+        if (isConnected) disconnectBLE();
+        startSimulation();
+      }
+    }
+
+    function startSimulation() {
+      isSimulating = true;
+      const simBtn = document.getElementById('simBtn');
+      const simBtnText = document.getElementById('simBtnText');
+      
+      simBtnText.textContent = 'Stop Simulation';
+      simBtn.className = 'flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white font-medium text-sm rounded-xl transition-all duration-200 shadow-lg shadow-purple-600/20 active:scale-95';
+
+      updateConnectionStatus('simulating');
+
+      // Base simulated voltages for 6 battery slots
+      const baseVoltages = [8.7, 7.9, 6.4, 9.2, 5.3, 3.8];
+
+      simTimer = setInterval(() => {
+        const payload = {};
+        baseVoltages.forEach((v, idx) => {
+          // Add minor noise fluctuation & gradual decay
+          const noise = (Math.random() - 0.5) * 0.08;
+          baseVoltages[idx] = Math.max(0, baseVoltages[idx] - 0.01 + noise);
+          const currentVoltage = baseVoltages[idx];
+          
+          payload[`s${idx + 1}`] = {
+            v: currentVoltage.toFixed(2),
+            st: currentVoltage >= 7.0 ? 'OK' : (currentVoltage >= 5.0 ? 'LOW' : 'EMPTY')
+          };
+        });
+
+        processTelemetryData(payload);
+      }, 1000);
+    }
+
+    function stopSimulation() {
+      isSimulating = false;
+      if (simTimer) clearInterval(simTimer);
+
+      const simBtn = document.getElementById('simBtn');
+      const simBtnText = document.getElementById('simBtnText');
+      
+      simBtnText.textContent = 'Start Simulation Mode';
+      simBtn.className = 'flex items-center gap-2 px-4 py-2 bg-purple-600/20 hover:bg-purple-600/30 text-purple-300 border border-purple-500/30 font-medium text-sm rounded-xl transition-all duration-200 active:scale-95';
+
+      updateConnectionStatus('disconnected');
+    }
+
     // Toggle Web Bluetooth Connection
     async function toggleBLEConnection() {
+      if (isSimulating) stopSimulation();
+
       if (isConnected) {
         disconnectBLE();
       } else {
@@ -393,7 +457,6 @@
 
     // Connect to ESP32 Device via Web Bluetooth API
     async function connectBLE() {
-      const connectBtn = document.getElementById('connectBtn');
       const connectBtnText = document.getElementById('connectBtnText');
 
       try {
@@ -463,6 +526,13 @@
         statusText.textContent = 'Live Telemetry';
         connectBtn.className = 'flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-500 text-white font-medium text-sm rounded-xl transition-all duration-200 shadow-lg shadow-red-600/20 active:scale-95';
         connectBtnText.textContent = 'Disconnect';
+      } else if (state === 'simulating') {
+        badge.className = 'flex items-center gap-2 px-3 py-2 rounded-xl bg-purple-500/10 border border-purple-500/30 text-xs font-medium text-purple-400';
+        statusPing.innerHTML = `
+          <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-purple-400 opacity-75"></span>
+          <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-purple-500"></span>
+        `;
+        statusText.textContent = 'Simulation Active';
       } else if (state === 'connecting') {
         badge.className = 'flex items-center gap-2 px-3 py-2 rounded-xl bg-yellow-500/10 border border-yellow-500/30 text-xs font-medium text-yellow-400';
         statusPing.innerHTML = `<span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-yellow-500 animate-pulse"></span>`;
@@ -482,58 +552,61 @@
       }
     }
 
-    // Process Incoming Telemetry Notifications
+    // Process Incoming Telemetry Notifications from BLE
     function handleTelemetryNotification(event) {
       const decoder = new TextDecoder('utf-8');
       const rawPayload = decoder.decode(event.target.value);
       
       try {
         const payload = JSON.parse(rawPayload);
-        packetCounter++;
-
-        let totalVoltage = 0;
-        let activeCount = 0;
-
-        // Parse format: {"s1":{"v":8.4,"st":"OK"}, ...} OR simple format: {"s1":8.4, ...}
-        for (let i = 1; i <= 6; i++) {
-          const key = `s${i}`;
-          if (payload[key] !== undefined) {
-            let v = 0;
-            let st = 'OK';
-
-            if (typeof payload[key] === 'object') {
-              v = parseFloat(payload[key].v) || 0;
-              st = payload[key].st || (v >= 5.0 ? 'OK' : 'EMPTY');
-            } else {
-              v = parseFloat(payload[key]) || 0;
-              st = v >= 5.0 ? 'OK' : 'EMPTY';
-            }
-
-            slotsData[i - 1].voltage = v;
-            slotsData[i - 1].status = st;
-
-            if (v >= 5.0) {
-              totalVoltage += v;
-              activeCount++;
-            }
-          }
-        }
-
-        // Update Top Summary Stats
-        document.getElementById('statActiveCount').textContent = `${activeCount} / 6`;
-        document.getElementById('statAvgVoltage').textContent = activeCount > 0 
-          ? `${(totalVoltage / activeCount).toFixed(2)} V` 
-          : '0.00 V';
-        document.getElementById('statPacketCount').textContent = packetCounter;
-        document.getElementById('statLastUpdate').textContent = `Last packet: ${new Date().toLocaleTimeString()}`;
-
-        // Render UI Cards & Append Data to Chart
-        renderBatteryCards();
-        updateChartData();
-
+        processTelemetryData(payload);
       } catch (err) {
         console.error('Error parsing telemetry JSON:', err, rawPayload);
       }
+    }
+
+    // Process Telemetry Data (Used by both BLE Notifications and Simulation Mode)
+    function processTelemetryData(payload) {
+      packetCounter++;
+
+      let totalVoltage = 0;
+      let activeCount = 0;
+
+      for (let i = 1; i <= 6; i++) {
+        const key = `s${i}`;
+        if (payload[key] !== undefined) {
+          let v = 0;
+          let st = 'OK';
+
+          if (typeof payload[key] === 'object') {
+            v = parseFloat(payload[key].v) || 0;
+            st = payload[key].st || (v >= 5.0 ? 'OK' : 'EMPTY');
+          } else {
+            v = parseFloat(payload[key]) || 0;
+            st = v >= 5.0 ? 'OK' : 'EMPTY';
+          }
+
+          slotsData[i - 1].voltage = v;
+          slotsData[i - 1].status = st;
+
+          if (v >= 5.0) {
+            totalVoltage += v;
+            activeCount++;
+          }
+        }
+      }
+
+      // Update Top Summary Stats
+      document.getElementById('statActiveCount').textContent = `${activeCount} / 6`;
+      document.getElementById('statAvgVoltage').textContent = activeCount > 0 
+        ? `${(totalVoltage / activeCount).toFixed(2)} V` 
+        : '0.00 V';
+      document.getElementById('statPacketCount').textContent = packetCounter;
+      document.getElementById('statLastUpdate').textContent = `Last packet: ${new Date().toLocaleTimeString()}`;
+
+      // Render UI Cards & Append Data to Chart
+      renderBatteryCards();
+      updateChartData();
     }
 
     // Update Chart Points
