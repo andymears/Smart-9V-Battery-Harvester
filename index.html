@@ -1,267 +1,560 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="dark">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Smart 9V Battery Hub Telemetry (6-Slot)</title>
-    <!-- Include Chart.js CDN -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #0f172a; color: #f8fafc; padding: 20px; text-align: center; margin: 0; }
-        .container { max-width: 600px; margin: 0 auto; }
-        .card { background: #1e293b; border-radius: 12px; padding: 20px; margin: 15px auto; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
-        button { background: #3b82f6; color: white; border: none; padding: 12px 24px; font-size: 16px; border-radius: 8px; cursor: pointer; font-weight: bold; width: 100%; transition: background 0.2s; margin-top: 8px; }
-        button:hover { background: #2563eb; }
-        button.sim { background: #10b981; }
-        button.sim:hover { background: #059669; }
-        .slot-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-top: 15px; }
-        .slot { background: #334155; padding: 12px; border-radius: 8px; font-size: 14px; text-align: left; }
-        .slot span { display: block; font-size: 18px; font-weight: bold; color: #38bdf8; margin-top: 4px; }
-        .sim-controls { display: none; margin-top: 8px; display: flex; flex-direction: column; gap: 3px; }
-        .sim-controls button { padding: 4px; font-size: 10px; margin-top: 0; background: #475569; }
-        .sim-controls button:hover { background: #64748b; }
-        .sim-controls button.remove { background: #7f1d1d; }
-        .sim-controls button.remove:hover { background: #991b1b; }
-        .summary { margin-top: 15px; font-size: 16px; background: #0284c7; padding: 10px; border-radius: 8px; font-weight: bold; }
-        #status { margin-top: 12px; font-size: 14px; color: #94a3b8; }
-        canvas { background: #0f172a; border-radius: 8px; margin-top: 10px; }
-    </style>
-</head>
-<body>
-
-    <div class="container">
-        <h1>🔋 Smart 9V Battery Hub (6-Slot)</h1>
-        
-        <!-- Connection Card -->
-        <div class="card">
-            <button id="connectBtn" onclick="connectBLE()">Connect to Hub</button>
-            <button id="simBtn" class="sim" onclick="toggleSimulation()">Start Simulation Mode</button>
-            <div id="status">Status: Disconnected</div>
-
-            <div class="slot-grid">
-                <!-- Slot 1 -->
-                <div class="slot">
-                    Slot 1<span id="slot1">-- V</span>
-                    <div id="controls1" class="sim-controls" style="display:none;">
-                        <button onclick="setSlotState(0, 8.4)">Fresh</button>
-                        <button onclick="setSlotState(0, 5.2)">Depleted</button>
-                        <button class="remove" onclick="setSlotState(0, 2.0)">Empty</button>
-                    </div>
-                </div>
-                <!-- Slot 2 -->
-                <div class="slot">
-                    Slot 2<span id="slot2">-- V</span>
-                    <div id="controls2" class="sim-controls" style="display:none;">
-                        <button onclick="setSlotState(1, 8.4)">Fresh</button>
-                        <button onclick="setSlotState(1, 5.2)">Depleted</button>
-                        <button class="remove" onclick="setSlotState(1, 2.0)">Empty</button>
-                    </div>
-                </div>
-                <!-- Slot 3 -->
-                <div class="slot">
-                    Slot 3<span id="slot3">-- V</span>
-                    <div id="controls3" class="sim-controls" style="display:none;">
-                        <button onclick="setSlotState(2, 8.4)">Fresh</button>
-                        <button onclick="setSlotState(2, 5.2)">Depleted</button>
-                        <button class="remove" onclick="setSlotState(2, 2.0)">Empty</button>
-                    </div>
-                </div>
-                <!-- Slot 4 -->
-                <div class="slot">
-                    Slot 4<span id="slot4">-- V</span>
-                    <div id="controls4" class="sim-controls" style="display:none;">
-                        <button onclick="setSlotState(3, 8.4)">Fresh</button>
-                        <button onclick="setSlotState(3, 5.2)">Depleted</button>
-                        <button class="remove" onclick="setSlotState(3, 2.0)">Empty</button>
-                    </div>
-                </div>
-                <!-- Slot 5 -->
-                <div class="slot">
-                    Slot 5<span id="slot5">-- V</span>
-                    <div id="controls5" class="sim-controls" style="display:none;">
-                        <button onclick="setSlotState(4, 8.4)">Fresh</button>
-                        <button onclick="setSlotState(4, 5.2)">Depleted</button>
-                        <button class="remove" onclick="setSlotState(4, 2.0)">Empty</button>
-                    </div>
-                </div>
-                <!-- Slot 6 -->
-                <div class="slot">
-                    Slot 6<span id="slot6">-- V</span>
-                    <div id="controls6" class="sim-controls" style="display:none;">
-                        <button onclick="setSlotState(5, 8.4)">Fresh</button>
-                        <button onclick="setSlotState(5, 5.2)">Depleted</button>
-                        <button class="remove" onclick="setSlotState(5, 2.0)">Empty</button>
-                    </div>
-                </div>
-            </div>
-
-            <div class="summary">
-                Common Bus Avg: <span id="busAvg">-- V</span>
-            </div>
-        </div>
-
-        <!-- Live Chart Card -->
-        <div class="card">
-            <h3>Voltage History</h3>
-            <canvas id="voltageChart" width="400" height="240"></canvas>
-        </div>
-    </div>
-
-    <script>
-        const SERVICE_UUID = "4fafc201-1fb5-459e-8fcc-c5c9c331914b";
-        const CHARACTERISTIC_UUID = "beb5483e-36e1-4688-b7f5-ea07361b26a8";
-        
-        let isSimulating = false;
-        let simInterval = null;
-        let simulatedVoltages = [8.4, 7.5, 6.8, 5.5, 4.2, 2.0]; // Initial 6-slot mock voltages
-
-        // Initialize Chart.js Line Graph for 6 slots + Bus Avg
-        const ctx = document.getElementById('voltageChart').getContext('2d');
-        const voltageChart = new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: [],
-                datasets: [
-                    { label: 'Slot 1', data: [], borderColor: '#38bdf8', tension: 0.2, fill: false },
-                    { label: 'Slot 2', data: [], borderColor: '#4ade80', tension: 0.2, fill: false },
-                    { label: 'Slot 3', data: [], borderColor: '#f43f5e', tension: 0.2, fill: false },
-                    { label: 'Slot 4', data: [], borderColor: '#fbbf24', tension: 0.2, fill: false },
-                    { label: 'Slot 5', data: [], borderColor: '#a78bfa', tension: 0.2, fill: false },
-                    { label: 'Slot 6', data: [], borderColor: '#fb7185', tension: 0.2, fill: false },
-                    { label: 'Bus Avg', data: [], borderColor: '#38ef7d', borderDash: [4,4], borderWidth: 2, tension: 0.2, fill: false }
-                ]
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Smart 9V Battery Harvester Dashboard</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Chart.js for real-time telemetry -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#f0fdf4',
+              500: '#22c55e',
+              600: '#16a34a',
+              900: '#14532d',
             },
-            options: {
-                responsive: true,
-                plugins: {
-                    legend: { labels: { color: '#f8fafc', boxWidth: 12, font: { size: 11 } } }
-                },
-                scales: {
-                    y: { 
-                        min: 0, 
-                        max: 9.5, 
-                        grid: { color: '#334155' },
-                        ticks: { color: '#94a3b8' },
-                        title: { display: true, text: 'Voltage (V)', color: '#94a3b8' } 
-                    },
-                    x: { 
-                        grid: { color: '#334155' },
-                        ticks: { color: '#94a3b8', maxTicksLimit: 6 },
-                        title: { display: true, text: 'Time', color: '#94a3b8' } 
-                    }
-                }
+            darkbg: '#0B0F17',
+            cardbg: '#111827',
+            cardborder: '#1F2937'
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap');
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: #0B0F17;
+      color: #F3F4F6;
+    }
+    .mono {
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .glow-green {
+      box-shadow: 0 0 15px rgba(34, 197, 94, 0.25);
+    }
+    .glow-red {
+      box-shadow: 0 0 15px rgba(239, 68, 68, 0.25);
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between antialiased selection:bg-brand-500 selection:text-black">
+
+  <!-- Main Container -->
+  <div class="max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-1 flex flex-col gap-6">
+
+    <!-- Top Navigation Header -->
+    <header class="flex flex-col md:flex-row md:items-center justify-between gap-4 p-5 bg-cardbg border border-cardborder rounded-2xl shadow-xl">
+      <div class="flex items-center gap-3">
+        <div class="p-3 bg-brand-500/10 rounded-xl border border-brand-500/20 text-brand-500">
+          <i data-lucide="zap" class="w-6 h-6"></i>
+        </div>
+        <div>
+          <h1 class="text-xl font-bold text-white tracking-wide flex items-center gap-2">
+            Smart 9V Battery Harvester
+            <span class="text-xs px-2.5 py-0.5 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20 mono font-normal">v1.2</span>
+          </h1>
+          <p class="text-xs text-gray-400 flex items-center gap-2 mt-0.5">
+            <i data-lucide="cpu" class="w-3.5 h-3.5 text-gray-500"></i>
+            ESP32 Telemetry & Real-Time Monitoring
+          </p>
+        </div>
+      </div>
+
+      <!-- Header Controls & Connection Status -->
+      <div class="flex flex-wrap items-center gap-3">
+        <!-- Live Clock -->
+        <div class="hidden sm:flex flex-col text-right px-3 py-1.5 bg-darkbg rounded-lg border border-cardborder">
+          <span class="text-[10px] text-gray-500 uppercase tracking-wider font-semibold">System Time</span>
+          <span id="liveClock" class="text-xs mono text-gray-300">--:--:--</span>
+        </div>
+
+        <!-- Connection Indicator Badge -->
+        <div id="connectionBadge" class="flex items-center gap-2 px-3 py-2 rounded-xl bg-gray-800/60 border border-gray-700/50 text-xs font-medium text-gray-400">
+          <span id="statusPing" class="relative flex h-2.5 w-2.5">
+            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-gray-400 opacity-75"></span>
+            <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-gray-500"></span>
+          </span>
+          <span id="statusText">Disconnected</span>
+        </div>
+
+        <!-- Connect/Disconnect Button -->
+        <button id="connectBtn" onclick="toggleBLEConnection()" class="flex items-center gap-2 px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white font-medium text-sm rounded-xl transition-all duration-200 shadow-lg shadow-brand-600/20 active:scale-95">
+          <i data-lucide="bluetooth" class="w-4 h-4"></i>
+          <span id="connectBtnText">Connect Harvester</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- Top Stats Row -->
+    <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <!-- Total Bus Power -->
+      <div class="p-4 bg-cardbg border border-cardborder rounded-xl flex items-center justify-between">
+        <div>
+          <p class="text-xs text-gray-400 font-medium">Active Harvest Bus</p>
+          <p id="statActiveCount" class="text-2xl font-bold text-white mt-1 mono">0 / 6</p>
+          <p class="text-[11px] text-gray-500 mt-1">Contributing Batteries</p>
+        </div>
+        <div class="p-3 bg-gray-800/50 rounded-xl text-brand-500 border border-gray-700/50">
+          <i data-lucide="battery-charging" class="w-6 h-6"></i>
+        </div>
+      </div>
+
+      <!-- Average Voltage -->
+      <div class="p-4 bg-cardbg border border-cardborder rounded-xl flex items-center justify-between">
+        <div>
+          <p class="text-xs text-gray-400 font-medium">Avg Slot Voltage</p>
+          <p id="statAvgVoltage" class="text-2xl font-bold text-white mt-1 mono">0.00 V</p>
+          <p class="text-[11px] text-gray-500 mt-1">Across active slots</p>
+        </div>
+        <div class="p-3 bg-gray-800/50 rounded-xl text-blue-400 border border-gray-700/50">
+          <i data-lucide="activity" class="w-6 h-6"></i>
+        </div>
+      </div>
+
+      <!-- Bus Regulator Output Target -->
+      <div class="p-4 bg-cardbg border border-cardborder rounded-xl flex items-center justify-between">
+        <div>
+          <p class="text-xs text-gray-400 font-medium">Regulated Output</p>
+          <p class="text-2xl font-bold text-brand-400 mt-1 mono">12.00 V</p>
+          <p class="text-[11px] text-gray-500 mt-1">XL6009 Boost Rail</p>
+        </div>
+        <div class="p-3 bg-gray-800/50 rounded-xl text-yellow-400 border border-gray-700/50">
+          <i data-lucide="gauge" class="w-6 h-6"></i>
+        </div>
+      </div>
+
+      <!-- Telemetry Packets -->
+      <div class="p-4 bg-cardbg border border-cardborder rounded-xl flex items-center justify-between">
+        <div>
+          <p class="text-xs text-gray-400 font-medium">Telemetry Updates</p>
+          <p id="statPacketCount" class="text-2xl font-bold text-white mt-1 mono">0</p>
+          <p id="statLastUpdate" class="text-[11px] text-gray-500 mt-1">Awaiting data...</p>
+        </div>
+        <div class="p-3 bg-gray-800/50 rounded-xl text-purple-400 border border-gray-700/50">
+          <i data-lucide="radio" class="w-6 h-6"></i>
+        </div>
+      </div>
+    </section>
+
+    <!-- 6-Slot Battery Cards Grid -->
+    <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4" id="batteryGrid">
+      <!-- Battery Cards generated dynamically via JavaScript -->
+    </section>
+
+    <!-- Real-Time Telemetry Chart Container -->
+    <section class="p-5 bg-cardbg border border-cardborder rounded-2xl shadow-xl flex flex-col gap-4">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-cardborder pb-4">
+        <div>
+          <h2 class="text-lg font-bold text-white flex items-center gap-2">
+            <i data-lucide="line-chart" class="w-5 h-5 text-brand-500"></i>
+            Live Multi-Channel Voltage Telemetry
+          </h2>
+          <p class="text-xs text-gray-400">Historical discharge monitoring over time across all 6 slots</p>
+        </div>
+        <div class="flex items-center gap-2 text-xs">
+          <button onclick="resetChartZoom()" class="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg border border-gray-700 transition-colors flex items-center gap-1.5">
+            <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i> Clear Buffer
+          </button>
+        </div>
+      </div>
+
+      <!-- Chart Canvas -->
+      <div class="relative w-full h-[320px]">
+        <canvas id="telemetryChart"></canvas>
+      </div>
+    </section>
+
+  </div>
+
+  <!-- Footer -->
+  <footer class="border-t border-cardborder bg-cardbg/50 py-4 mt-6">
+    <div class="max-w-7xl mx-auto px-4 text-center text-xs text-gray-500 flex flex-col sm:flex-row items-center justify-between gap-2">
+      <p>Smart 9V Battery Harvester — Open Hardware Project</p>
+      <p class="mono text-[11px] text-gray-600">Licensing: MIT (Software) / CERN-OHL-P (Hardware)</p>
+    </div>
+  </footer>
+
+  <!-- Web Bluetooth & Dashboard Controller Script -->
+  <script>
+    // System UUID Configuration
+    const BLE_SERVICE_UUID = '4fafc201-1fb5-459e-8fcc-c5c9c331914b';
+    const BLE_CHARACTERISTIC_UUID = 'beb5483e-36e1-4688-b7f5-ea07361b26a8';
+
+    // State Variables
+    let bleDevice = null;
+    let bleCharacteristic = null;
+    let isConnected = false;
+    let packetCounter = 0;
+    let chartInstance = null;
+    const maxDataPoints = 30; // Max points stored on line chart x-axis
+
+    // Slot Color Tokens for UI & Charting
+    const slotColors = [
+      { border: '#22c55e', bg: 'rgba(34, 197, 94, 0.1)', name: 'Slot 1' },
+      { border: '#3b82f6', bg: 'rgba(59, 130, 246, 0.1)', name: 'Slot 2' },
+      { border: '#a855f7', bg: 'rgba(168, 85, 247, 0.1)', name: 'Slot 3' },
+      { border: '#f59e0b', bg: 'rgba(245, 158, 11, 0.1)', name: 'Slot 4' },
+      { border: '#ec4899', bg: 'rgba(236, 72, 153, 0.1)', name: 'Slot 5' },
+      { border: '#06b6d4', bg: 'rgba(6, 182, 212, 0.1)', name: 'Slot 6' }
+    ];
+
+    // Initial Slot State Data
+    let slotsData = Array.from({ length: 6 }, (_, i) => ({
+      id: i + 1,
+      voltage: 0.0,
+      status: 'DISCONNECTED', // 'OK', 'LOW', 'EMPTY', 'DISCONNECTED'
+      rawADC: 0
+    }));
+
+    // Initialize Dashboard UI & Chart on Page Load
+    document.addEventListener('DOMContentLoaded', () => {
+      lucide.createIcons();
+      initLiveClock();
+      renderBatteryCards();
+      initChart();
+    });
+
+    // Update Header Clock
+    function initLiveClock() {
+      const clockEl = document.getElementById('liveClock');
+      setInterval(() => {
+        const now = new Date();
+        clockEl.textContent = now.toLocaleTimeString();
+      }, 1000);
+    }
+
+    // Dynamic Battery Slot Cards Rendering
+    function renderBatteryCards() {
+      const grid = document.getElementById('batteryGrid');
+      grid.innerHTML = '';
+
+      slotsData.forEach((slot, index) => {
+        const color = slotColors[index];
+        const isHealthy = slot.status === 'OK';
+        const isEmpty = slot.status === 'EMPTY' || slot.voltage < 5.0;
+        const isConnected = slot.status !== 'DISCONNECTED';
+
+        // Percentage estimation based on 9.6V max and 5.0V cutoff
+        let pct = Math.round(((slot.voltage - 5.0) / (9.6 - 5.0)) * 100);
+        pct = Math.max(0, Math.min(100, isNaN(pct) ? 0 : pct));
+
+        let badgeStyle = 'bg-gray-800 text-gray-400 border-gray-700';
+        let statusText = 'OFFLINE';
+
+        if (isConnected) {
+          if (slot.voltage >= 7.0) {
+            badgeStyle = 'bg-brand-500/10 text-brand-400 border-brand-500/30';
+            statusText = 'HEALTHY';
+          } else if (slot.voltage >= 5.0) {
+            badgeStyle = 'bg-yellow-500/10 text-yellow-400 border-yellow-500/30';
+            statusText = 'LOW';
+          } else {
+            badgeStyle = 'bg-red-500/10 text-red-400 border-red-500/30';
+            statusText = 'DEPLETED';
+          }
+        }
+
+        const card = document.createElement('div');
+        card.className = `p-5 bg-cardbg border rounded-2xl shadow-lg transition-all duration-300 relative overflow-hidden ${
+          isEmpty && isConnected ? 'border-red-500/50 glow-red' : 'border-cardborder hover:border-gray-700'
+        }`;
+
+        card.innerHTML = `
+          <!-- Top Slot Title & Status Badge -->
+          <div class="flex items-center justify-between mb-3">
+            <div class="flex items-center gap-2">
+              <span class="w-3 h-3 rounded-full inline-block" style="background-color: ${color.border}"></span>
+              <h3 class="font-bold text-white text-base">Slot ${slot.id}</h3>
+            </div>
+            <span class="text-xs px-2.5 py-1 rounded-full border font-semibold mono ${badgeStyle}">
+              ${statusText}
+            </span>
+          </div>
+
+          <!-- Voltage Display -->
+          <div class="my-3 flex items-baseline justify-between">
+            <span class="text-3xl font-extrabold text-white mono tracking-tight">
+              ${slot.voltage.toFixed(2)} <span class="text-lg font-normal text-gray-400">V</span>
+            </span>
+            <span class="text-xs text-gray-400 mono">${pct}% Capacity</span>
+          </div>
+
+          <!-- Progress Bar Indicator -->
+          <div class="w-full bg-gray-800 h-2 rounded-full overflow-hidden p-0.5 border border-gray-700/50">
+            <div class="h-full rounded-full transition-all duration-500" 
+                 style="width: ${pct}%; background-color: ${isEmpty ? '#ef4444' : color.border}"></div>
+          </div>
+
+          <!-- Footer Status Detail -->
+          <div class="mt-4 pt-3 border-t border-gray-800/80 flex items-center justify-between text-xs text-gray-400">
+            <span class="flex items-center gap-1.5">
+              <i data-lucide="cpu" class="w-3.5 h-3.5 text-gray-500"></i>
+              ADC Pin ${getPinForSlot(slot.id)}
+            </span>
+            <span class="mono">${slot.voltage >= 5.0 ? 'Harvesting' : 'Bypassed'}</span>
+          </div>
+        `;
+        grid.appendChild(card);
+      });
+      lucide.createIcons();
+    }
+
+    function getPinForSlot(slotId) {
+      const pins = [36, 39, 34, 35, 32, 33];
+      return pins[slotId - 1] || 'NC';
+    }
+
+    // Chart.js Telemetry Initialization
+    function initChart() {
+      const ctx = document.getElementById('telemetryChart').getContext('2d');
+      
+      const datasets = slotColors.map((color, i) => ({
+        label: `Slot ${i + 1}`,
+        borderColor: color.border,
+        backgroundColor: color.bg,
+        borderWidth: 2,
+        pointRadius: 2,
+        pointHoverRadius: 5,
+        tension: 0.3,
+        data: []
+      }));
+
+      chartInstance = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: [],
+          datasets: datasets
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          animation: { duration: 300 },
+          scales: {
+            x: {
+              grid: { color: '#1F2937' },
+              ticks: { color: '#9CA3AF', font: { family: 'JetBrains Mono', size: 11 } }
+            },
+            y: {
+              min: 0,
+              max: 11,
+              grid: { color: '#1F2937' },
+              ticks: { 
+                color: '#9CA3AF', 
+                font: { family: 'JetBrains Mono', size: 11 },
+                callback: (value) => `${value}V`
+              }
             }
+          },
+          plugins: {
+            legend: {
+              position: 'top',
+              labels: { color: '#E5E7EB', font: { family: 'Inter', size: 12 }, usePointStyle: true }
+            },
+            tooltip: {
+              backgroundColor: '#111827',
+              titleColor: '#F3F4F6',
+              bodyColor: '#D1D5DB',
+              borderColor: '#374151',
+              borderWidth: 1,
+              padding: 10
+            }
+          }
+        }
+      });
+    }
+
+    function resetChartZoom() {
+      if (chartInstance) {
+        chartInstance.data.labels = [];
+        chartInstance.data.datasets.forEach(ds => ds.data = []);
+        chartInstance.update();
+      }
+    }
+
+    // Toggle Web Bluetooth Connection
+    async function toggleBLEConnection() {
+      if (isConnected) {
+        disconnectBLE();
+      } else {
+        await connectBLE();
+      }
+    }
+
+    // Connect to ESP32 Device via Web Bluetooth API
+    async function connectBLE() {
+      const connectBtn = document.getElementById('connectBtn');
+      const connectBtnText = document.getElementById('connectBtnText');
+
+      try {
+        updateConnectionStatus('connecting');
+        connectBtnText.textContent = 'Searching...';
+
+        console.log('Requesting BLE device...');
+        bleDevice = await navigator.bluetooth.requestDevice({
+          filters: [{ name: '9V_Harvester' }],
+          optionalServices: [BLE_SERVICE_UUID]
         });
 
-        function toggleSimulation() {
-            isSimulating = !isSimulating;
-            const simBtn = document.getElementById('simBtn');
-            const connectBtn = document.getElementById('connectBtn');
-            const controlDivs = document.querySelectorAll('.sim-controls');
+        bleDevice.addEventListener('gattserverdisconnected', onDisconnected);
 
-            if (isSimulating) {
-                simBtn.innerText = "Stop Simulation Mode";
-                connectBtn.style.display = "none";
-                document.getElementById('status').innerText = "Status: 6-Slot Simulation Active";
-                controlDivs.forEach(div => div.style.display = "flex");
-                
-                simInterval = setInterval(() => {
-                    // Gradual background drain for active batteries
-                    simulatedVoltages = simulatedVoltages.map(v => {
-                        if (v <= 4.0) return v;
-                        let nextV = v - 0.02;
-                        return nextV < 4.0 ? 2.0 : +nextV.toFixed(2);
-                    });
+        console.log('Connecting to GATT server...');
+        const server = await bleDevice.gatt.connect();
 
-                    pushSimulationTick();
-                }, 2000);
+        console.log('Getting Service...');
+        const service = await server.getPrimaryService(BLE_SERVICE_UUID);
 
+        console.log('Getting Characteristic...');
+        bleCharacteristic = await service.getCharacteristic(BLE_CHARACTERISTIC_UUID);
+
+        await bleCharacteristic.startNotifications();
+        bleCharacteristic.addEventListener('characteristicvaluechanged', handleTelemetryNotification);
+
+        isConnected = true;
+        updateConnectionStatus('connected');
+        console.log('BLE Telemetry Connected!');
+
+      } catch (error) {
+        console.error('BLE Connection Error:', error);
+        updateConnectionStatus('disconnected');
+        alert('Bluetooth Connection Failed: ' + error.message);
+      }
+    }
+
+    // Disconnect BLE
+    function disconnectBLE() {
+      if (bleDevice && bleDevice.gatt.connected) {
+        bleDevice.gatt.disconnect();
+      }
+      onDisconnected();
+    }
+
+    // GATT Disconnected Callback
+    function onDisconnected() {
+      isConnected = false;
+      updateConnectionStatus('disconnected');
+      console.log('BLE Disconnected.');
+    }
+
+    // Update Status Badge and UI Elements
+    function updateConnectionStatus(state) {
+      const badge = document.getElementById('connectionBadge');
+      const statusPing = document.getElementById('statusPing');
+      const statusText = document.getElementById('statusText');
+      const connectBtn = document.getElementById('connectBtn');
+      const connectBtnText = document.getElementById('connectBtnText');
+
+      if (state === 'connected') {
+        badge.className = 'flex items-center gap-2 px-3 py-2 rounded-xl bg-brand-500/10 border border-brand-500/30 text-xs font-medium text-brand-400';
+        statusPing.innerHTML = `
+          <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-brand-400 opacity-75"></span>
+          <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-brand-500"></span>
+        `;
+        statusText.textContent = 'Live Telemetry';
+        connectBtn.className = 'flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-500 text-white font-medium text-sm rounded-xl transition-all duration-200 shadow-lg shadow-red-600/20 active:scale-95';
+        connectBtnText.textContent = 'Disconnect';
+      } else if (state === 'connecting') {
+        badge.className = 'flex items-center gap-2 px-3 py-2 rounded-xl bg-yellow-500/10 border border-yellow-500/30 text-xs font-medium text-yellow-400';
+        statusPing.innerHTML = `<span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-yellow-500 animate-pulse"></span>`;
+        statusText.textContent = 'Pairing...';
+      } else {
+        badge.className = 'flex items-center gap-2 px-3 py-2 rounded-xl bg-gray-800/60 border border-gray-700/50 text-xs font-medium text-gray-400';
+        statusPing.innerHTML = `
+          <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-gray-500"></span>
+        `;
+        statusText.textContent = 'Disconnected';
+        connectBtn.className = 'flex items-center gap-2 px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white font-medium text-sm rounded-xl transition-all duration-200 shadow-lg shadow-brand-600/20 active:scale-95';
+        connectBtnText.textContent = 'Connect Harvester';
+        
+        // Mark slots offline
+        slotsData.forEach(s => s.status = 'DISCONNECTED');
+        renderBatteryCards();
+      }
+    }
+
+    // Process Incoming Telemetry Notifications
+    function handleTelemetryNotification(event) {
+      const decoder = new TextDecoder('utf-8');
+      const rawPayload = decoder.decode(event.target.value);
+      
+      try {
+        const payload = JSON.parse(rawPayload);
+        packetCounter++;
+
+        let totalVoltage = 0;
+        let activeCount = 0;
+
+        // Parse format: {"s1":{"v":8.4,"st":"OK"}, ...} OR simple format: {"s1":8.4, ...}
+        for (let i = 1; i <= 6; i++) {
+          const key = `s${i}`;
+          if (payload[key] !== undefined) {
+            let v = 0;
+            let st = 'OK';
+
+            if (typeof payload[key] === 'object') {
+              v = parseFloat(payload[key].v) || 0;
+              st = payload[key].st || (v >= 5.0 ? 'OK' : 'EMPTY');
             } else {
-                simBtn.innerText = "Start Simulation Mode";
-                connectBtn.style.display = "block";
-                document.getElementById('status').innerText = "Status: Disconnected";
-                controlDivs.forEach(div => div.style.display = "none");
-                clearInterval(simInterval);
+              v = parseFloat(payload[key]) || 0;
+              st = v >= 5.0 ? 'OK' : 'EMPTY';
             }
-        }
 
-        function setSlotState(index, voltage) {
-            if (!isSimulating) return;
-            simulatedVoltages[index] = voltage;
-            pushSimulationTick();
-        }
+            slotsData[i - 1].voltage = v;
+            slotsData[i - 1].status = st;
 
-        function pushSimulationTick() {
-            const active = simulatedVoltages.filter(v => v > 4.0);
-            const avg = active.length > 0 ? (active.reduce((a,b)=>a+b, 0) / active.length).toFixed(2) : "0.00";
-            const mockString = `${simulatedVoltages.join(',')}|${avg}`;
-            processTelemetry(mockString);
-        }
-
-        async function connectBLE() {
-            try {
-                document.getElementById('status').innerText = "Status: Scanning...";
-                const device = await navigator.bluetooth.requestDevice({
-                    filters: [{ name: "Smart-9V-Hub" }],
-                    optionalServices: [SERVICE_UUID]
-                });
-
-                document.getElementById('status').innerText = "Status: Connecting to GATT...";
-                const server = await device.gatt.connect();
-                
-                const service = await server.getPrimaryService(SERVICE_UUID);
-                const characteristic = await service.getCharacteristic(CHARACTERISTIC_UUID);
-
-                document.getElementById('status').innerText = "Status: Connected & Streaming";
-                document.getElementById('connectBtn').style.display = "none";
-                document.getElementById('simBtn').style.display = "none";
-
-                await characteristic.startNotifications();
-                characteristic.addEventListener('characteristicvaluechanged', (event) => {
-                    const value = new TextDecoder().decode(event.target.value);
-                    processTelemetry(value);
-                });
-
-            } catch (error) {
-                console.error(error);
-                document.getElementById('status').innerText = "Status: Connection Failed / Cancelled";
+            if (v >= 5.0) {
+              totalVoltage += v;
+              activeCount++;
             }
+          }
         }
 
-        function processTelemetry(dataString) {
-            const parts = dataString.split('|');
-            if (parts.length === 2) {
-                const voltages = parts[0].split(',');
-                const avg = parseFloat(parts[1]);
-                const timeNow = new Date().toLocaleTimeString();
+        // Update Top Summary Stats
+        document.getElementById('statActiveCount').textContent = `${activeCount} / 6`;
+        document.getElementById('statAvgVoltage').textContent = activeCount > 0 
+          ? `${(totalVoltage / activeCount).toFixed(2)} V` 
+          : '0.00 V';
+        document.getElementById('statPacketCount').textContent = packetCounter;
+        document.getElementById('statLastUpdate').textContent = `Last packet: ${new Date().toLocaleTimeString()}`;
 
-                // Update text metrics for 6 slots
-                for (let i = 0; i < voltages.length; i++) {
-                    const slotElem = document.getElementById(`slot${i+1}`);
-                    if (slotElem) {
-                        slotElem.innerText = parseFloat(voltages[i]) > 4.0 ? `${voltages[i]} V` : "Empty";
-                    }
-                }
-                document.getElementById('busAvg').innerText = `${avg} V`;
+        // Render UI Cards & Append Data to Chart
+        renderBatteryCards();
+        updateChartData();
 
-                // Update chart rolling window
-                if (voltageChart.data.labels.length > 20) {
-                    voltageChart.data.labels.shift();
-                    voltageChart.data.datasets.forEach(dataset => dataset.data.shift());
-                }
+      } catch (err) {
+        console.error('Error parsing telemetry JSON:', err, rawPayload);
+      }
+    }
 
-                voltageChart.data.labels.push(timeNow);
-                for (let i = 0; i < voltages.length; i++) {
-                    if (voltageChart.data.datasets[i]) {
-                        voltageChart.data.datasets[i].data.push(parseFloat(voltages[i]));
-                    }
-                }
-                // Bus Avg is dataset index 6
-                voltageChart.data.datasets[6].data.push(avg);
-                
-                voltageChart.update();
-            }
-        }
-    </script>
+    // Update Chart Points
+    function updateChartData() {
+      if (!chartInstance) return;
+
+      const timeLabel = new Date().toLocaleTimeString();
+      chartInstance.data.labels.push(timeLabel);
+
+      slotsData.forEach((slot, i) => {
+        chartInstance.data.datasets[i].data.push(slot.voltage);
+      });
+
+      // Maintain fixed rolling window size
+      if (chartInstance.data.labels.length > maxDataPoints) {
+        chartInstance.data.labels.shift();
+        chartInstance.data.datasets.forEach(ds => ds.data.shift());
+      }
+
+      chartInstance.update();
+    }
+  </script>
 </body>
 </html>
